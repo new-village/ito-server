@@ -88,11 +88,11 @@ async def _process_path_results(session, result) -> SubgraphResponse:
     )
 
 
-def _process_neighbor_results(records: list[dict]) -> SubgraphResponse:
-    """Process neighbor query results.
+async def _process_neighbor_results(result) -> SubgraphResponse:
+    """Process neighbor query results using async iteration.
 
     Args:
-        records: List of records containing start, neighbor, and rel.
+        result: Neo4j result object.
 
     Returns:
         SubgraphResponse with unique nodes and links.
@@ -100,7 +100,7 @@ def _process_neighbor_results(records: list[dict]) -> SubgraphResponse:
     nodes_dict: dict[str, GraphNode] = {}
     links_dict: dict[str, GraphLink] = {}
 
-    for record in records:
+    async for record in result:
         start_node = record.get("start")
         neighbor_node = record.get("neighbor")
         rel = record.get("r")
@@ -162,23 +162,25 @@ async def get_neighbors(
 
     async with get_session() as session:
         result = await session.run(query, {"node_id": node_id, "limit": limit})
-        records = await result.data()
+        response = await _process_neighbor_results(result)
 
-    if not records:
+    if not response.nodes:
         # Check if the starting node exists
         check_query = "MATCH (n {node_id: $node_id}) RETURN n LIMIT 1"
         async with get_session() as session:
             check_result = await session.run(check_query, {"node_id": node_id})
-            check_records = await check_result.data()
+            check_node = None
+            async for record in check_result:
+                check_node = record.get("n")
+                break
 
-        if not check_records:
+        if not check_node:
             raise HTTPException(
                 status_code=404,
                 detail=f"Node with node_id {node_id} not found"
             )
 
         # Node exists but has no neighbors (or no neighbors with the specified label)
-        node = check_records[0]["n"]
         if label:
             raise HTTPException(
                 status_code=404,
@@ -187,11 +189,11 @@ async def get_neighbors(
 
         # Return just the starting node with no links
         return SubgraphResponse(
-            nodes=[_process_node(node)],
+            nodes=[_process_node(check_node)],
             links=[],
         )
 
-    return _process_neighbor_results(records)
+    return response
 
 
 @router.get(

@@ -40,29 +40,44 @@ def create_mock_relationship(element_id, rel_type, start_node, end_node, propert
     return mock_rel
 
 
-class AsyncIterator:
-    """Helper class to create async iterator from a list."""
+class AsyncResultIterator:
+    """Async iterator that mimics Neo4j Result behavior.
+    
+    Neo4j's async driver returns results that can be iterated with `async for`.
+    Each item is a Record-like object with a .get() method.
+    """
 
-    def __init__(self, items):
-        self.items = items
+    def __init__(self, records: list[dict]):
+        self.records = records
         self.index = 0
 
     def __aiter__(self):
         return self
 
     async def __anext__(self):
-        if self.index >= len(self.items):
+        if self.index >= len(self.records):
             raise StopAsyncIteration
-        item = self.items[self.index]
+        # Create a mock record with .get() method
+        record_data = self.records[self.index]
+        mock_record = MagicMock()
+        mock_record.get = lambda key, default=None: record_data.get(key, default)
         self.index += 1
-        return item
+        return mock_record
 
 
-def create_async_result(records):
-    """Create a mock async result that supports async iteration."""
+def create_mock_neo4j_result(records: list[dict]):
+    """Create a mock Neo4j result that supports async iteration.
+    
+    This mimics the behavior of neo4j.AsyncResult which:
+    - Can be iterated with `async for record in result:`
+    - Each record has a .get(key) method to retrieve values
+    - Also supports .data() for backward compatibility (returns dicts)
+    """
     mock_result = MagicMock()
+    # Support for result.data() - returns list of dicts
     mock_result.data = AsyncMock(return_value=records)
-    mock_result.__aiter__ = lambda self: AsyncIterator(records).__aiter__()
+    # Support for async iteration - returns Record-like objects
+    mock_result.__aiter__ = lambda self: AsyncResultIterator(records)
     return mock_result
 
 
@@ -76,8 +91,7 @@ class TestGetNeighbors:
         node2 = create_mock_node("4:test:2", ["officer"], {"node_id": 12346, "name": "Person B"})
         rel = create_mock_relationship("5:test:1", "役員", node2, node1, {})
 
-        mock_result = MagicMock()
-        mock_result.data = AsyncMock(return_value=[{"start": node1, "r": rel, "neighbor": node2}])
+        mock_result = create_mock_neo4j_result([{"start": node1, "r": rel, "neighbor": node2}])
 
         mock_session = MagicMock()
         mock_session.run = AsyncMock(return_value=mock_result)
@@ -105,8 +119,7 @@ class TestGetNeighbors:
         node2 = create_mock_node("4:test:2", ["officer"], {"node_id": 12346, "name": "Person B"})
         rel = create_mock_relationship("5:test:1", "役員", node2, node1, {})
 
-        mock_result = MagicMock()
-        mock_result.data = AsyncMock(return_value=[{"start": node1, "r": rel, "neighbor": node2}])
+        mock_result = create_mock_neo4j_result([{"start": node1, "r": rel, "neighbor": node2}])
 
         mock_session = MagicMock()
         mock_session.run = AsyncMock(return_value=mock_result)
@@ -129,12 +142,10 @@ class TestGetNeighbors:
     async def test_get_neighbors_node_not_found(self, test_client):
         """Test getting neighbors of a non-existent node."""
         # First query returns no results
-        mock_result = MagicMock()
-        mock_result.data = AsyncMock(return_value=[])
+        mock_result = create_mock_neo4j_result([])
 
         # Check query also returns no results
-        mock_check_result = MagicMock()
-        mock_check_result.data = AsyncMock(return_value=[])
+        mock_check_result = create_mock_neo4j_result([])
 
         mock_session = MagicMock()
         mock_session.run = AsyncMock(side_effect=[mock_result, mock_check_result])
@@ -156,12 +167,10 @@ class TestGetNeighbors:
         node1 = create_mock_node("4:test:1", ["entity"], {"node_id": 12345, "name": "Company A"})
 
         # First query returns no results (no neighbors with label)
-        mock_result = MagicMock()
-        mock_result.data = AsyncMock(return_value=[])
+        mock_result = create_mock_neo4j_result([])
 
         # Check query returns the node (node exists)
-        mock_check_result = MagicMock()
-        mock_check_result.data = AsyncMock(return_value=[{"n": node1}])
+        mock_check_result = create_mock_neo4j_result([{"n": node1}])
 
         mock_session = MagicMock()
         mock_session.run = AsyncMock(side_effect=[mock_result, mock_check_result])
@@ -190,11 +199,7 @@ class TestShortestPath:
         rel = create_mock_relationship("5:test:1", "役員", node2, node1, {})
         mock_path = create_mock_path([node1, node2], [rel])
 
-        # Create mock record that supports .get()
-        mock_record = MagicMock()
-        mock_record.get = MagicMock(side_effect=lambda k: mock_path if k == "path" else None)
-
-        mock_result = create_async_result([mock_record])
+        mock_result = create_mock_neo4j_result([{"path": mock_path}])
 
         mock_session = MagicMock()
         mock_session.run = AsyncMock(return_value=mock_result)
@@ -218,7 +223,7 @@ class TestShortestPath:
     @pytest.mark.asyncio
     async def test_shortest_path_not_found(self, test_client):
         """Test when no path exists between nodes."""
-        mock_result = create_async_result([])
+        mock_result = create_mock_neo4j_result([])
 
         mock_session = MagicMock()
         mock_session.run = AsyncMock(return_value=mock_result)
