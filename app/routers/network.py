@@ -54,11 +54,12 @@ def _process_relationship(rel) -> GraphLink:
     )
 
 
-def _process_path_results(records: list[dict]) -> SubgraphResponse:
+async def _process_path_results(session, result) -> SubgraphResponse:
     """Process path results and extract unique nodes and relationships.
 
     Args:
-        records: List of records containing paths.
+        session: Neo4j session.
+        result: Neo4j result object.
 
     Returns:
         SubgraphResponse with unique nodes and links.
@@ -66,7 +67,7 @@ def _process_path_results(records: list[dict]) -> SubgraphResponse:
     nodes_dict: dict[str, GraphNode] = {}
     links_dict: dict[str, GraphLink] = {}
 
-    for record in records:
+    async for record in result:
         path = record.get("path")
         if not path:
             continue
@@ -226,15 +227,15 @@ async def find_shortest_path(
             query,
             {"start_node_id": start_node_id, "end_node_id": end_node_id}
         )
-        records = await result.data()
+        response = await _process_path_results(session, result)
 
-    if not records:
+    if not response.nodes:
         raise HTTPException(
             status_code=404,
             detail=f"No path found between nodes {start_node_id} and {end_node_id} within {max_hops} hops"
         )
 
-    return _process_path_results(records)
+    return response
 
 
 @router.get(

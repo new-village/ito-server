@@ -40,6 +40,32 @@ def create_mock_relationship(element_id, rel_type, start_node, end_node, propert
     return mock_rel
 
 
+class AsyncIterator:
+    """Helper class to create async iterator from a list."""
+
+    def __init__(self, items):
+        self.items = items
+        self.index = 0
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self.index >= len(self.items):
+            raise StopAsyncIteration
+        item = self.items[self.index]
+        self.index += 1
+        return item
+
+
+def create_async_result(records):
+    """Create a mock async result that supports async iteration."""
+    mock_result = MagicMock()
+    mock_result.data = AsyncMock(return_value=records)
+    mock_result.__aiter__ = lambda self: AsyncIterator(records).__aiter__()
+    return mock_result
+
+
 class TestGetNeighbors:
     """Tests for the get neighbors endpoint."""
 
@@ -164,8 +190,11 @@ class TestShortestPath:
         rel = create_mock_relationship("5:test:1", "役員", node2, node1, {})
         mock_path = create_mock_path([node1, node2], [rel])
 
-        mock_result = MagicMock()
-        mock_result.data = AsyncMock(return_value=[{"path": mock_path}])
+        # Create mock record that supports .get()
+        mock_record = MagicMock()
+        mock_record.get = MagicMock(side_effect=lambda k: mock_path if k == "path" else None)
+
+        mock_result = create_async_result([mock_record])
 
         mock_session = MagicMock()
         mock_session.run = AsyncMock(return_value=mock_result)
@@ -189,8 +218,7 @@ class TestShortestPath:
     @pytest.mark.asyncio
     async def test_shortest_path_not_found(self, test_client):
         """Test when no path exists between nodes."""
-        mock_result = MagicMock()
-        mock_result.data = AsyncMock(return_value=[])
+        mock_result = create_async_result([])
 
         mock_session = MagicMock()
         mock_session.run = AsyncMock(return_value=mock_result)
