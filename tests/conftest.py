@@ -1,6 +1,7 @@
 """Pytest configuration and fixtures for ITO Server tests."""
 
 import os
+from datetime import datetime
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -11,6 +12,10 @@ from httpx import ASGITransport, AsyncClient
 os.environ["NEO4J_URL"] = "neo4j://localhost:7687"
 os.environ["NEO4J_USERNAME"] = "neo4j"
 os.environ["NEO4J_PASSWORD"] = "testpassword"
+os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only"
+os.environ["DATABASE_PATH"] = "./test.db"
+os.environ["FIRST_ADMIN_USER"] = "testadmin"
+os.environ["FIRST_ADMIN_PASSWORD"] = "testadminpassword"
 
 
 @pytest.fixture
@@ -46,17 +51,62 @@ def mock_neo4j_node():
 
 
 @pytest.fixture
+def mock_authenticated_user():
+    """Create a mock authenticated user for testing."""
+    from app.models.user import User
+
+    mock_user = MagicMock(spec=User)
+    mock_user.id = 1
+    mock_user.username = "testuser"
+    mock_user.email = "test@example.com"
+    mock_user.is_active = True
+    mock_user.is_admin = False
+    mock_user.created_at = datetime.utcnow()
+    mock_user.updated_at = datetime.utcnow()
+    return mock_user
+
+
+@pytest.fixture
 async def test_client(mock_neo4j_driver) -> AsyncGenerator[AsyncClient, None]:
     """Create a test client with mocked Neo4j connection."""
-    with patch("app.database.AsyncGraphDatabase.driver", return_value=mock_neo4j_driver):
-        with patch("app.database.Neo4jConnection._driver", mock_neo4j_driver):
-            from app.main import app
+    with patch("app.db.neo4j.AsyncGraphDatabase.driver", return_value=mock_neo4j_driver):
+        with patch("app.db.neo4j.Neo4jConnection._driver", mock_neo4j_driver):
+            # Mock SQLite init to avoid creating test database
+            with patch("app.main.init_db"):
+                with patch("app.main.bootstrap_admin_user"):
+                    from app.main import app
 
-            async with AsyncClient(
-                transport=ASGITransport(app=app),
-                base_url="http://test"
-            ) as client:
-                yield client
+                    async with AsyncClient(
+                        transport=ASGITransport(app=app),
+                        base_url="http://test"
+                    ) as client:
+                        yield client
+
+
+@pytest.fixture
+async def authenticated_test_client(mock_neo4j_driver, mock_authenticated_user) -> AsyncGenerator[AsyncClient, None]:
+    """Create a test client with authentication mocked."""
+    with patch("app.db.neo4j.AsyncGraphDatabase.driver", return_value=mock_neo4j_driver):
+        with patch("app.db.neo4j.Neo4jConnection._driver", mock_neo4j_driver):
+            with patch("app.main.init_db"):
+                with patch("app.main.bootstrap_admin_user"):
+                    from app.main import app
+                    from app.auth.dependencies import get_current_active_user
+
+                    # Override authentication dependency
+                    async def mock_get_current_active_user():
+                        return mock_authenticated_user
+
+                    app.dependency_overrides[get_current_active_user] = mock_get_current_active_user
+
+                    async with AsyncClient(
+                        transport=ASGITransport(app=app),
+                        base_url="http://test"
+                    ) as client:
+                        yield client
+
+                    # Clean up override
+                    app.dependency_overrides.clear()
 
 
 @pytest.fixture

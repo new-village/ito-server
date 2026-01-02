@@ -8,7 +8,7 @@ class TestExecuteCypher:
     """Tests for the execute Cypher endpoint."""
 
     @pytest.mark.asyncio
-    async def test_execute_valid_query(self, test_client):
+    async def test_execute_valid_query(self, authenticated_test_client):
         """Test executing a valid Cypher query."""
 
         class MockAsyncIterator:
@@ -40,7 +40,7 @@ class TestExecuteCypher:
             mock_context.__aexit__ = AsyncMock(return_value=None)
             mock_get_session.return_value = mock_context
 
-            response = await test_client.post(
+            response = await authenticated_test_client.post(
                 "/api/v1/cypher/execute",
                 json={"query": "MATCH (n) RETURN count(n) AS count"}
             )
@@ -52,9 +52,9 @@ class TestExecuteCypher:
             assert "keys" in data
 
     @pytest.mark.asyncio
-    async def test_execute_empty_query(self, test_client):
+    async def test_execute_empty_query(self, authenticated_test_client):
         """Test that empty queries are rejected."""
-        response = await test_client.post(
+        response = await authenticated_test_client.post(
             "/api/v1/cypher/execute",
             json={"query": ""}
         )
@@ -64,7 +64,7 @@ class TestExecuteCypher:
         assert "empty" in data["detail"].lower()
 
     @pytest.mark.asyncio
-    async def test_execute_with_parameters(self, test_client):
+    async def test_execute_with_parameters(self, authenticated_test_client):
         """Test executing query with parameters."""
 
         class MockAsyncIterator:
@@ -96,7 +96,7 @@ class TestExecuteCypher:
             mock_context.__aexit__ = AsyncMock(return_value=None)
             mock_get_session.return_value = mock_context
 
-            response = await test_client.post(
+            response = await authenticated_test_client.post(
                 "/api/v1/cypher/execute",
                 json={
                     "query": "MATCH (n {node_id: $id}) RETURN n",
@@ -107,7 +107,7 @@ class TestExecuteCypher:
             assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_execute_dangerous_query_rejected(self, test_client):
+    async def test_execute_dangerous_query_rejected(self, authenticated_test_client):
         """Test that dangerous queries are rejected."""
         dangerous_queries = [
             "DELETE n",
@@ -116,12 +116,22 @@ class TestExecuteCypher:
         ]
 
         for query in dangerous_queries:
-            response = await test_client.post(
+            response = await authenticated_test_client.post(
                 "/api/v1/cypher/execute",
                 json={"query": query}
             )
 
             assert response.status_code == 403, f"Query should be rejected: {query}"
+
+    @pytest.mark.asyncio
+    async def test_execute_requires_auth(self, test_client):
+        """Test that execute endpoint requires authentication."""
+        response = await test_client.post(
+            "/api/v1/cypher/execute",
+            json={"query": "MATCH (n) RETURN n LIMIT 1"}
+        )
+
+        assert response.status_code == 401
 
 
 class TestGetSchema:
@@ -148,12 +158,12 @@ class TestGetSchema:
 
         mock_labels_result = MagicMock()
         mock_labels_result.__aiter__ = lambda self: MockAsyncIterator([
-            {"label": "法人"}, {"label": "役員/株主"}
+            {"label": "entity"}, {"label": "officer"}
         ])
 
         mock_rels_result = MagicMock()
         mock_rels_result.__aiter__ = lambda self: MockAsyncIterator([
-            {"relationshipType": "役員"}
+            {"relationshipType": "officer_of"}
         ])
 
         mock_props_result = MagicMock()

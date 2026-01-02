@@ -1,10 +1,13 @@
 """Async Cypher Query API router for executing arbitrary queries."""
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from typing import Any
+from typing import Annotated, Any
 
-from app.database import get_session
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+
+from app.db.neo4j import get_session
+from app.models.user import User
+from app.auth.dependencies import get_current_active_user
 
 router = APIRouter(prefix="/cypher", tags=["cypher"])
 
@@ -98,13 +101,17 @@ def _serialize_record(record: dict) -> dict:
     "/execute",
     response_model=CypherResponse,
     summary="Execute a Cypher query",
-    description="Execute an arbitrary Cypher query asynchronously and return raw results.",
+    description="Execute an arbitrary Cypher query asynchronously and return raw results. Requires authentication.",
 )
-async def execute_cypher(request: CypherRequest) -> CypherResponse:
+async def execute_cypher(
+    request: CypherRequest,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> CypherResponse:
     """Execute an arbitrary Cypher query.
 
     Args:
         request: CypherRequest containing the query and optional parameters.
+        current_user: The authenticated user (injected by dependency).
 
     Returns:
         CypherResponse with raw query results.

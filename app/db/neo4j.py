@@ -1,4 +1,4 @@
-"""Database connection management for Neo4j.
+"""Neo4j database connection management.
 
 Implements a singleton driver pattern using FastAPI's lifespan context manager.
 Uses the official neo4j Python driver with AsyncGraphDatabase.

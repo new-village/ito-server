@@ -10,26 +10,33 @@
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │                      ITO Server                            │  │
 │  │  ┌─────────┐  ┌──────────┐  ┌──────────┐  ┌───────────┐  │  │
-│  │  │ 検索    │  │ネットワ  │  │ Cypher   │  │ ヘルス    │  │  │
+│  │  │ 検索    │  │ネットワ  │  │ Cypher🔒 │  │ ヘルス    │  │  │
 │  │  │  API    │  │ーク API  │  │   API    │  │ チェック  │  │  │
 │  │  └────┬────┘  └────┬─────┘  └────┬─────┘  └───────────┘  │  │
 │  │       │            │             │                        │  │
 │  │       └────────────┼─────────────┘                        │  │
 │  │                    │                                      │  │
-│  │             ┌──────┴──────┐                               │  │
-│  │             │  Neo4j      │                               │  │
-│  │             │  Driver     │                               │  │
-│  │             │  (非同期)   │                               │  │
-│  │             └──────┬──────┘                               │  │
-│  └────────────────────┼──────────────────────────────────────┘  │
-└───────────────────────┼─────────────────────────────────────────┘
-                        │
-                        ▼
-              ┌─────────────────┐
-              │   Neo4j Aura    │
-              │  データベース   │
-              └─────────────────┘
+│  │  ┌────────────┐   │   ┌──────────────┐                   │  │
+│  │  │ 認証 API   │   │   │   SQLite     │                   │  │
+│  │  │ (JWT/OAuth)│───┼───│ (ユーザーDB)  │                   │  │
+│  │  └────────────┘   │   └──────────────┘                   │  │
+│  │                    │        │ Cloud Storage マウント        │  │
+│  │             ┌──────┴──────┐ │                             │  │
+│  │             │  Neo4j      │ │                             │  │
+│  │             │  Driver     │ │                             │  │
+│  │             │  (非同期)    │ │                             │  │
+│  │             └──────┬──────┘ │                             │  │
+│  └────────────────────┼────────┼─────────────────────────────┘  │
+└───────────────────────┼────────┼────────────────────────────────┘
+                        │        │
+                        ▼        ▼
+              ┌─────────────────┐  ┌─────────────────┐
+              │   Neo4j Aura    │  │ Cloud Storage   │
+              │  データベース   │  │  /data/ito.db   │
+              └─────────────────┘  └─────────────────┘
 ```
+
+🔒 = 認証が必要
 
 ## ✨ 機能
 
@@ -48,18 +55,24 @@
    - 直接の隣接ノードを取得
    - 返却エンティティ数の制限
 
-3. **非同期Cypher API** (`/api/v1/cypher/`)
-   - 任意のCypherクエリを実行
+3. **非同期Cypher API** (`/api/v1/cypher/`) 🔒
+   - 任意のCypherクエリを実行（認証必須）
    - データベーススキーマを取得
    - データベース統計を取得
+
+4. **認証API** (`/api/v1/auth/`)
+   - JWTトークンを使用したOAuth2パスワードフロー
+   - ユーザーログインとトークン生成
+   - ユーザープロファイル取得
+   - SQLiteベースのユーザーストレージ
 
 ### グラフスキーマ
 
 **ノードラベル:**
-- `役員/株主`: 役員および株主
-- `法人`: 法人エンティティ
-- `仲介者`: 仲介者
-- `住所`: 住所
+- `officer`: 役員および株主
+- `entity`: 法人エンティティ
+- `intermediary`: 仲介者
+- `address`: 住所
 
 **リレーションシップタイプ:**
 - `役員`: 役員関係
@@ -130,9 +143,16 @@
    
    `.env`ファイルを作成:
    ```env
+   # Neo4j接続
    NEO4J_URL=neo4j+s://your-instance.databases.neo4j.io
    NEO4J_USERNAME=neo4j
    NEO4J_PASSWORD=your-password
+   
+   # 認証
+   SECRET_KEY=your-secret-key-change-in-production
+   DATABASE_PATH=./ito.db
+   FIRST_ADMIN_USER=admin
+   FIRST_ADMIN_PASSWORD=your-admin-password
    ```
 
 5. **サーバーを起動**
@@ -202,8 +222,13 @@ docker run -p 8080:8080 \
 | `NEO4J_URL` | Neo4j接続URL | はい |
 | `NEO4J_USERNAME` | Neo4jユーザー名 | はい |
 | `NEO4J_PASSWORD` | Neo4jパスワード | はい |
+| `SECRET_KEY` | JWT署名用秘密鍵 | はい |
+| `DATABASE_PATH` | SQLiteデータベースパス | はい |
+| `FIRST_ADMIN_USER` | 初期管理者ユーザー名 | はい |
+| `FIRST_ADMIN_PASSWORD` | 初期管理者パスワード | はい |
+| `ALGORITHM` | JWTアルゴリズム | いいえ（デフォルト: HS256） |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | JWTトークン有効期限 | いいえ（デフォルト: 30） |
 | `DEBUG` | デバッグモードを有効化 | いいえ（デフォルト: false） |
-| `CORS_ORIGINS` | 許可されたCORSオリジン | いいえ（デフォルト: ["*"]） |
 
 ## 📖 APIドキュメント
 
@@ -245,11 +270,12 @@ GET /api/v1/network/neighbors/{node_id}?relationship_type={type}&limit={limit}
 GET /api/v1/network/shortest-path?start_node_id={id1}&end_node_id={id2}&max_hops={hops}
 ```
 
-### Cypher API
+### Cypher API (🔒 認証必須)
 
 #### クエリ実行
 ```http
 POST /api/v1/cypher/execute
+Authorization: Bearer <token>
 Content-Type: application/json
 
 {
@@ -266,6 +292,30 @@ GET /api/v1/cypher/schema
 #### 統計取得
 ```http
 GET /api/v1/cypher/stats
+```
+
+### 認証API
+
+#### ログイン
+```http
+POST /api/v1/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+username=admin&password=admin
+```
+
+レスポンス:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+#### 現在のユーザーを取得
+```http
+GET /api/v1/auth/me
+Authorization: Bearer <token>
 ```
 
 ### ヘルスエンドポイント
@@ -296,18 +346,32 @@ GET /live      # ライブネスチェック
 ito-server/
 ├── app/
 │   ├── __init__.py
-│   ├── config.py          # pydantic-settingsによる設定
-│   ├── database.py        # Neo4j接続管理
-│   ├── main.py            # FastAPIアプリケーション
-│   ├── models.py          # Pydanticモデル
+│   ├── config.py              # pydantic-settingsによる設定
+│   ├── main.py                # FastAPIアプリケーション
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── auth.py            # 認証エンドポイント
+│   ├── auth/
+│   │   ├── __init__.py
+│   │   ├── dependencies.py    # 認証依存性注入
+│   │   └── security.py        # JWTとパスワードユーティリティ
+│   ├── db/
+│   │   ├── __init__.py
+│   │   ├── neo4j.py           # Neo4j接続管理
+│   │   └── session.py         # SQLiteセッション管理
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── graph.py           # グラフレスポンスモデル
+│   │   └── user.py            # ユーザーSQLModel
 │   └── routers/
 │       ├── __init__.py
-│       ├── search.py      # 検索APIエンドポイント
-│       ├── network.py     # ネットワーク探索エンドポイント
-│       └── cypher.py      # Cypherクエリエンドポイント
+│       ├── search.py          # 検索APIエンドポイント
+│       ├── network.py         # ネットワーク探索エンドポイント
+│       └── cypher.py          # Cypherクエリエンドポイント（保護済み）
 ├── tests/
 │   ├── __init__.py
-│   ├── conftest.py        # テストフィクスチャ
+│   ├── conftest.py            # テストフィクスチャ
+│   ├── test_auth.py           # 認証テスト
 │   ├── test_main.py
 │   ├── test_search.py
 │   ├── test_network.py

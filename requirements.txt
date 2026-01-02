@@ -13,5 +13,14 @@ neo4j>=5.17.0,<6.0.0
 pydantic>=2.5.0,<3.0.0
 pydantic-settings>=2.1.0,<3.0.0
 
+# SQLite ORM (User Authentication)
+sqlmodel>=0.0.22,<1.0.0
+
+# Authentication & Security
+passlib[bcrypt]>=1.7.4,<2.0.0
+python-jose[cryptography]>=3.3.0,<4.0.0
+python-multipart>=0.0.6,<1.0.0
+bcrypt>=4.0.0,<4.1.0
+
 # Production Server
 gunicorn>=21.2.0,<23.0.0

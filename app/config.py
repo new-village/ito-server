@@ -7,6 +7,7 @@ Uses pydantic-settings for environment variable management.
 
 from functools import lru_cache
 
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -23,6 +24,18 @@ class Settings(BaseSettings):
     NEO4J_URL: str
     NEO4J_USERNAME: str
     NEO4J_PASSWORD: str
+
+    # SQLite Database Settings (Required)
+    DATABASE_PATH: str
+
+    # JWT Authentication Settings (Required)
+    SECRET_KEY: SecretStr
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+
+    # First Admin User (Required - auto-created on startup if no users exist)
+    FIRST_ADMIN_USER: str
+    FIRST_ADMIN_PASSWORD: SecretStr
 
     # Application Settings
     APP_NAME: str = "ITO Server"

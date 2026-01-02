@@ -10,26 +10,33 @@ A FastAPI-based REST API backend for network investigation, connecting to Neo4j 
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │                      ITO Server                            │  │
 │  │  ┌─────────┐  ┌──────────┐  ┌──────────┐  ┌───────────┐  │  │
-│  │  │ Search  │  │ Network  │  │ Cypher   │  │  Health   │  │  │
+│  │  │ Search  │  │ Network  │  │ Cypher🔒 │  │  Health   │  │  │
 │  │  │   API   │  │   API    │  │   API    │  │   Check   │  │  │
 │  │  └────┬────┘  └────┬─────┘  └────┬─────┘  └───────────┘  │  │
 │  │       │            │             │                        │  │
 │  │       └────────────┼─────────────┘                        │  │
 │  │                    │                                      │  │
-│  │             ┌──────┴──────┐                               │  │
-│  │             │  Neo4j      │                               │  │
-│  │             │  Driver     │                               │  │
-│  │             │  (Async)    │                               │  │
-│  │             └──────┬──────┘                               │  │
-│  └────────────────────┼──────────────────────────────────────┘  │
-└───────────────────────┼─────────────────────────────────────────┘
-                        │
-                        ▼
-              ┌─────────────────┐
-              │   Neo4j Aura    │
-              │    Database     │
-              └─────────────────┘
+│  │  ┌────────────┐   │   ┌──────────────┐                   │  │
+│  │  │ Auth API   │   │   │   SQLite     │                   │  │
+│  │  │ (JWT/OAuth)│───┼───│  (Users DB)  │                   │  │
+│  │  └────────────┘   │   └──────────────┘                   │  │
+│  │                    │        │ Cloud Storage Mount         │  │
+│  │             ┌──────┴──────┐ │                             │  │
+│  │             │  Neo4j      │ │                             │  │
+│  │             │  Driver     │ │                             │  │
+│  │             │  (Async)    │ │                             │  │
+│  │             └──────┬──────┘ │                             │  │
+│  └────────────────────┼────────┼─────────────────────────────┘  │
+└───────────────────────┼────────┼────────────────────────────────┘
+                        │        │
+                        ▼        ▼
+              ┌─────────────────┐  ┌─────────────────┐
+              │   Neo4j Aura    │  │ Cloud Storage   │
+              │    Database     │  │  /data/ito.db   │
+              └─────────────────┘  └─────────────────┘
 ```
+
+🔒 = Requires authentication
 
 ## ✨ Features
 
@@ -48,18 +55,24 @@ A FastAPI-based REST API backend for network investigation, connecting to Neo4j 
    - Get immediate neighbors
    - Limit total returned entities
 
-3. **Async Cypher API** (`/api/v1/cypher/`)
-   - Execute arbitrary Cypher queries
+3. **Async Cypher API** (`/api/v1/cypher/`) 🔒
+   - Execute arbitrary Cypher queries (requires authentication)
    - Get database schema
    - Get database statistics
+
+4. **Authentication API** (`/api/v1/auth/`)
+   - OAuth2 Password Flow with JWT tokens
+   - User login and token generation
+   - User profile retrieval
+   - SQLite-based user storage
 
 ### Graph Schema
 
 **Node Labels:**
-- `役員/株主` (Officer): Officers and shareholders
-- `法人` (Entity): Corporate entities
-- `仲介者` (Intermediary): Intermediaries
-- `住所` (Address): Addresses
+- `officer`: Officers and shareholders
+- `entity`: Corporate entities
+- `intermediary`: Intermediaries
+- `address`: Addresses
 
 **Relationship Types:**
 - `役員`: Officer relationship
@@ -130,9 +143,16 @@ Subgraph results follow a structured JSON schema for easy integration with visua
    
    Create a `.env` file:
    ```env
+   # Neo4j Connection
    NEO4J_URL=neo4j+s://your-instance.databases.neo4j.io
    NEO4J_USERNAME=neo4j
    NEO4J_PASSWORD=your-password
+   
+   # Authentication
+   SECRET_KEY=your-secret-key-change-in-production
+   DATABASE_PATH=./ito.db
+   FIRST_ADMIN_USER=admin
+   FIRST_ADMIN_PASSWORD=your-admin-password
    ```
 
 5. **Run the server**
@@ -202,8 +222,13 @@ docker run -p 8080:8080 \
 | `NEO4J_URL` | Neo4j connection URL | Yes |
 | `NEO4J_USERNAME` | Neo4j username | Yes |
 | `NEO4J_PASSWORD` | Neo4j password | Yes |
+| `SECRET_KEY` | JWT signing secret key | Yes |
+| `DATABASE_PATH` | SQLite database path | Yes |
+| `FIRST_ADMIN_USER` | Initial admin username | Yes |
+| `FIRST_ADMIN_PASSWORD` | Initial admin password | Yes |
+| `ALGORITHM` | JWT algorithm | No (default: HS256) |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT token expiry | No (default: 30) |
 | `DEBUG` | Enable debug mode | No (default: false) |
-| `CORS_ORIGINS` | Allowed CORS origins | No (default: ["*"]) |
 
 ## 📖 API Documentation
 
@@ -245,11 +270,12 @@ GET /api/v1/network/neighbors/{node_id}?relationship_type={type}&limit={limit}
 GET /api/v1/network/shortest-path?start_node_id={id1}&end_node_id={id2}&max_hops={hops}
 ```
 
-### Cypher API
+### Cypher API (🔒 Requires Authentication)
 
 #### Execute Query
 ```http
 POST /api/v1/cypher/execute
+Authorization: Bearer <token>
 Content-Type: application/json
 
 {
@@ -266,6 +292,30 @@ GET /api/v1/cypher/schema
 #### Get Statistics
 ```http
 GET /api/v1/cypher/stats
+```
+
+### Authentication API
+
+#### Login
+```http
+POST /api/v1/auth/login
+Content-Type: application/x-www-form-urlencoded
+
+username=admin&password=admin
+```
+
+Response:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "bearer"
+}
+```
+
+#### Get Current User
+```http
+GET /api/v1/auth/me
+Authorization: Bearer <token>
 ```
 
 ### Health Endpoints
@@ -296,18 +346,32 @@ Configuration is managed via `pydantic-settings`. All settings can be overridden
 ito-server/
 ├── app/
 │   ├── __init__.py
-│   ├── config.py          # Configuration with pydantic-settings
-│   ├── database.py        # Neo4j connection management
-│   ├── main.py            # FastAPI application
-│   ├── models.py          # Pydantic models
+│   ├── config.py              # Configuration with pydantic-settings
+│   ├── main.py                # FastAPI application
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── auth.py            # Authentication endpoints
+│   ├── auth/
+│   │   ├── __init__.py
+│   │   ├── dependencies.py    # Auth dependency injection
+│   │   └── security.py        # JWT and password utilities
+│   ├── db/
+│   │   ├── __init__.py
+│   │   ├── neo4j.py           # Neo4j connection management
+│   │   └── session.py         # SQLite session management
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── graph.py           # Graph response models
+│   │   └── user.py            # User SQLModel
 │   └── routers/
 │       ├── __init__.py
-│       ├── search.py      # Search API endpoints
-│       ├── network.py     # Network traversal endpoints
-│       └── cypher.py      # Cypher query endpoints
+│       ├── search.py          # Search API endpoints
+│       ├── network.py         # Network traversal endpoints
+│       └── cypher.py          # Cypher query endpoints (protected)
 ├── tests/
 │   ├── __init__.py
-│   ├── conftest.py        # Test fixtures
+│   ├── conftest.py            # Test fixtures
+│   ├── test_auth.py           # Authentication tests
 │   ├── test_main.py
 │   ├── test_search.py
 │   ├── test_network.py

@@ -1,13 +1,17 @@
 """Search API router for finding nodes by properties."""
 
-from fastapi import APIRouter, HTTPException, Query
+from typing import Annotated
 
-from app.database import get_session
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.db.neo4j import get_session
 from app.models import (
     GraphNode,
     NodeLabel,
     SearchResponse,
 )
+from app.models.user import User
+from app.auth.dependencies import get_current_active_user
 
 router = APIRouter(prefix="/search", tags=["search"])
 

@@ -1,14 +1,18 @@
 """Network Traversal API router for retrieving subgraphs."""
 
-from fastapi import APIRouter, HTTPException, Query
+from typing import Annotated
 
-from app.database import get_session
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from app.db.neo4j import get_session
 from app.models import (
     GraphLink,
     GraphNode,
     NodeLabel,
     SubgraphResponse,
 )
+from app.models.user import User
+from app.auth.dependencies import get_current_active_user
 from app.config import get_settings
 
 router = APIRouter(prefix="/network", tags=["network"])

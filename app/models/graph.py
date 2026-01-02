@@ -1,4 +1,4 @@
-"""Pydantic models for ITO Server API.
+"""Pydantic models for ITO Server API (Graph-related).
 
 Defines schemas for nodes, links, and API responses based on
 the Neo4j graph schema (schema/neo4j_importer_model.json).
@@ -126,7 +126,7 @@ class GraphNode(BaseModel):
 
     id: str = Field(..., description="Unique identifier (element_id from Neo4j)")
     node_id: int = Field(..., description="Node ID property")
-    label: str = Field(..., description="Node label (役員/株主, 法人, 仲介者, 住所)")
+    label: str = Field(..., description="Node label (officer, entity, intermediary, address)")
     properties: dict[str, Any] = Field(default_factory=dict, description="Node properties")
 
 
