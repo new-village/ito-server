@@ -205,14 +205,14 @@ async def get_neighbors(
 async def find_shortest_path(
     start_node_id: int = Query(..., description="Starting node's node_id"),
     end_node_id: int = Query(..., description="Ending node's node_id"),
-    max_hops: int = Query(5, ge=1, le=10, description="Maximum path length"),
+    max_hops: int = Query(4, ge=1, le=10, description="Maximum path length (default: 4)"),
 ) -> SubgraphResponse:
     """Find the shortest path between two nodes.
 
     Args:
         start_node_id: The starting node's node_id property.
         end_node_id: The ending node's node_id property.
-        max_hops: Maximum number of hops to search.
+        max_hops: Maximum number of hops to search (default: 4).
 
     Returns:
         SubgraphResponse with nodes and links in the shortest path.

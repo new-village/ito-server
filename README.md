@@ -265,8 +265,12 @@ Parameters:
 
 #### Find Shortest Path
 ```http
+GET /api/v1/network/shortest-path?start_node_id={id1}&end_node_id={id2}
 GET /api/v1/network/shortest-path?start_node_id={id1}&end_node_id={id2}&max_hops={hops}
 ```
+
+Parameters:
+- `max_hops` (optional): Maximum path length to search (default: 4, range: 1-10)
 
 ### Cypher API (🔒 Requires Authentication)
 

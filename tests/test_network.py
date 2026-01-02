@@ -192,8 +192,8 @@ class TestShortestPath:
     """Tests for the shortest path endpoint."""
 
     @pytest.mark.asyncio
-    async def test_find_shortest_path(self, test_client):
-        """Test finding shortest path between two nodes."""
+    async def test_find_shortest_path_with_default_max_hops(self, test_client):
+        """Test finding shortest path with default max_hops (4)."""
         node1 = create_mock_node("4:test:1", ["entity"], {"node_id": 12345, "name": "Company A"})
         node2 = create_mock_node("4:test:2", ["officer"], {"node_id": 12346, "name": "Person B"})
         rel = create_mock_relationship("5:test:1", "役員", node2, node1, {})
@@ -211,6 +211,7 @@ class TestShortestPath:
             mock_context.__aexit__ = AsyncMock(return_value=None)
             mock_get_session.return_value = mock_context
 
+            # Call without max_hops - should use default value of 4
             response = await test_client.get(
                 "/api/v1/network/shortest-path?start_node_id=12345&end_node_id=12346"
             )
@@ -219,6 +220,46 @@ class TestShortestPath:
             data = response.json()
             assert "nodes" in data
             assert "links" in data
+
+            # Verify the query was called with max_hops=4 in the path pattern
+            call_args = mock_session.run.call_args
+            query = call_args[0][0]
+            assert "[*1..4]" in query
+
+    @pytest.mark.asyncio
+    async def test_find_shortest_path_with_custom_max_hops(self, test_client):
+        """Test finding shortest path with custom max_hops."""
+        node1 = create_mock_node("4:test:1", ["entity"], {"node_id": 12345, "name": "Company A"})
+        node2 = create_mock_node("4:test:2", ["officer"], {"node_id": 12346, "name": "Person B"})
+        rel = create_mock_relationship("5:test:1", "役員", node2, node1, {})
+        mock_path = create_mock_path([node1, node2], [rel])
+
+        mock_result = create_mock_neo4j_result([{"path": mock_path}])
+
+        mock_session = MagicMock()
+        mock_session.run = AsyncMock(return_value=mock_result)
+        mock_session.close = AsyncMock()
+
+        with patch("app.routers.network.get_session") as mock_get_session:
+            mock_context = MagicMock()
+            mock_context.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_context.__aexit__ = AsyncMock(return_value=None)
+            mock_get_session.return_value = mock_context
+
+            # Call with custom max_hops=7
+            response = await test_client.get(
+                "/api/v1/network/shortest-path?start_node_id=12345&end_node_id=12346&max_hops=7"
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert "nodes" in data
+            assert "links" in data
+
+            # Verify the query was called with max_hops=7 in the path pattern
+            call_args = mock_session.run.call_args
+            query = call_args[0][0]
+            assert "[*1..7]" in query
 
     @pytest.mark.asyncio
     async def test_shortest_path_not_found(self, test_client):

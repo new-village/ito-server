@@ -265,8 +265,12 @@ GET /api/v1/network/neighbors/{node_id}?label={label}&limit={limit}
 
 #### 最短経路検索
 ```http
+GET /api/v1/network/shortest-path?start_node_id={id1}&end_node_id={id2}
 GET /api/v1/network/shortest-path?start_node_id={id1}&end_node_id={id2}&max_hops={hops}
 ```
+
+パラメータ:
+- `max_hops` (任意): 探索する経路長の上限 (デフォルト: 4、範囲: 1-10)
 
 ### Cypher API (🔒 認証必須)
 
