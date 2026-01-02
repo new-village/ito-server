@@ -48,12 +48,10 @@ A FastAPI-based REST API backend for network investigation, connecting to Neo4j 
    - Search by any property
    - Filter by node label
 
-2. **Network Traversal API** (`/api/v1/network/`)
-   - Traverse network from a starting node
-   - Configurable hop depth (1-5)
+2. **Network API** (`/api/v1/network/`)
+   - Get immediate neighbors of a node
+   - Filter neighbors by label
    - Find shortest path between nodes
-   - Get immediate neighbors
-   - Limit total returned entities
 
 3. **Async Cypher API** (`/api/v1/cypher/`) 🔒
    - Execute arbitrary Cypher queries (requires authentication)
@@ -255,15 +253,15 @@ GET /api/v1/search/labels
 
 ### Network API
 
-#### Traverse Network
-```http
-GET /api/v1/network/traverse/{node_id}?hops={hops}&limit={limit}
-```
-
 #### Get Neighbors
 ```http
-GET /api/v1/network/neighbors/{node_id}?relationship_type={type}&limit={limit}
+GET /api/v1/network/neighbors/{node_id}
+GET /api/v1/network/neighbors/{node_id}?label={label}&limit={limit}
 ```
+
+Parameters:
+- `label` (optional): Filter neighbors by label (`officer`, `entity`, `intermediary`, `address`)
+- `limit` (optional): Maximum neighbors to return (default: 100)
 
 #### Find Shortest Path
 ```http

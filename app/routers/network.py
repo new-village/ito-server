@@ -1,8 +1,6 @@
 """Network Traversal API router for retrieving subgraphs."""
 
-from typing import Annotated
-
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from app.db.neo4j import get_session
 from app.models import (
@@ -11,11 +9,49 @@ from app.models import (
     NodeLabel,
     SubgraphResponse,
 )
-from app.models.user import User
-from app.auth.dependencies import get_current_active_user
 from app.config import get_settings
 
 router = APIRouter(prefix="/network", tags=["network"])
+
+
+def _process_node(node) -> GraphNode:
+    """Process a Neo4j node into a GraphNode.
+
+    Args:
+        node: Neo4j node object.
+
+    Returns:
+        GraphNode instance.
+    """
+    properties = dict(node.items())
+    node_id = properties.pop("node_id", 0)
+    labels = list(node.labels)
+    label = labels[0] if labels else "Unknown"
+
+    return GraphNode(
+        id=node.element_id,
+        node_id=node_id,
+        label=label,
+        properties=properties,
+    )
+
+
+def _process_relationship(rel) -> GraphLink:
+    """Process a Neo4j relationship into a GraphLink.
+
+    Args:
+        rel: Neo4j relationship object.
+
+    Returns:
+        GraphLink instance.
+    """
+    return GraphLink(
+        id=rel.element_id,
+        source=rel.start_node.element_id,
+        target=rel.end_node.element_id,
+        type=rel.type,
+        properties=dict(rel.items()) if hasattr(rel, "items") else {},
+    )
 
 
 def _process_path_results(records: list[dict]) -> SubgraphResponse:
@@ -38,28 +74,44 @@ def _process_path_results(records: list[dict]) -> SubgraphResponse:
         # Process nodes in the path
         for node in path.nodes:
             if node.element_id not in nodes_dict:
-                properties = dict(node)
-                node_id = properties.pop("node_id", 0)
-                labels = list(node.labels)
-                label = labels[0] if labels else "Unknown"
-
-                nodes_dict[node.element_id] = GraphNode(
-                    id=node.element_id,
-                    node_id=node_id,
-                    label=label,
-                    properties=properties,
-                )
+                nodes_dict[node.element_id] = _process_node(node)
 
         # Process relationships in the path
         for rel in path.relationships:
             if rel.element_id not in links_dict:
-                links_dict[rel.element_id] = GraphLink(
-                    id=rel.element_id,
-                    source=rel.start_node.element_id,
-                    target=rel.end_node.element_id,
-                    type=rel.type,
-                    properties=dict(rel),
-                )
+                links_dict[rel.element_id] = _process_relationship(rel)
+
+    return SubgraphResponse(
+        nodes=list(nodes_dict.values()),
+        links=list(links_dict.values()),
+    )
+
+
+def _process_neighbor_results(records: list[dict]) -> SubgraphResponse:
+    """Process neighbor query results.
+
+    Args:
+        records: List of records containing start, neighbor, and rel.
+
+    Returns:
+        SubgraphResponse with unique nodes and links.
+    """
+    nodes_dict: dict[str, GraphNode] = {}
+    links_dict: dict[str, GraphLink] = {}
+
+    for record in records:
+        start_node = record.get("start")
+        neighbor_node = record.get("neighbor")
+        rel = record.get("r")
+
+        if start_node and start_node.element_id not in nodes_dict:
+            nodes_dict[start_node.element_id] = _process_node(start_node)
+
+        if neighbor_node and neighbor_node.element_id not in nodes_dict:
+            nodes_dict[neighbor_node.element_id] = _process_node(neighbor_node)
+
+        if rel and rel.element_id not in links_dict:
+            links_dict[rel.element_id] = _process_relationship(rel)
 
     return SubgraphResponse(
         nodes=list(nodes_dict.values()),
@@ -68,44 +120,42 @@ def _process_path_results(records: list[dict]) -> SubgraphResponse:
 
 
 @router.get(
-    "/traverse/{node_id}",
+    "/neighbors/{node_id}",
     response_model=SubgraphResponse,
-    summary="Traverse network from a starting node",
-    description="Retrieve a subgraph starting from a specific node with configurable hop depth.",
+    summary="Get immediate neighbors of a node",
+    description="Retrieve all directly connected nodes (1-hop) for a specific node. "
+    "Optionally filter neighbors by their label.",
 )
-async def traverse_network(
+async def get_neighbors(
     node_id: int,
-    label: NodeLabel | None = Query(None, description="Label of the starting node"),
-    hops: int = Query(1, ge=1, le=5, description="Number of hops to traverse"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum total entities to return"),
+    label: NodeLabel | None = Query(None, description="Filter neighbors by this label"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum neighbors to return"),
 ) -> SubgraphResponse:
-    """Traverse the network starting from a specific node.
+    """Get immediate neighbors of a node.
 
     Args:
-        node_id: The starting node's node_id property.
-        label: Optional label of the starting node.
-        hops: Number of relationship hops to traverse (default: 1, max: 5).
-        limit: Maximum number of paths to return.
+        node_id: The node's node_id property.
+        label: Optional label to filter neighbors (not the starting node).
+        limit: Maximum number of neighbors to return.
 
     Returns:
-        SubgraphResponse with nodes and links in the traversed subgraph.
+        SubgraphResponse with the starting node and its neighbors.
     """
     settings = get_settings()
-
-    # Enforce limits
-    hops = min(hops, settings.MAX_HOPS)
     limit = min(limit, settings.MAX_LIMIT)
 
     if label:
+        # Filter neighbors by label
         query = f"""
-        MATCH path = (start:`{label.value}` {{node_id: $node_id}})-[*1..{hops}]-(connected)
-        RETURN path
+        MATCH (start {{node_id: $node_id}})-[r]-(neighbor:`{label.value}`)
+        RETURN start, r, neighbor
         LIMIT $limit
         """
     else:
-        query = f"""
-        MATCH path = (start {{node_id: $node_id}})-[*1..{hops}]-(connected)
-        RETURN path
+        # Get all neighbors regardless of label
+        query = """
+        MATCH (start {node_id: $node_id})-[r]-(neighbor)
+        RETURN start, r, neighbor
         LIMIT $limit
         """
 
@@ -121,88 +171,26 @@ async def traverse_network(
             check_records = await check_result.data()
 
         if not check_records:
-            raise HTTPException(status_code=404, detail=f"Node with node_id {node_id} not found")
+            raise HTTPException(
+                status_code=404,
+                detail=f"Node with node_id {node_id} not found"
+            )
 
-        # Node exists but has no connections
+        # Node exists but has no neighbors (or no neighbors with the specified label)
         node = check_records[0]["n"]
-        properties = dict(node)
-        node_id_prop = properties.pop("node_id", 0)
-        labels = list(node.labels)
-        node_label = labels[0] if labels else "Unknown"
+        if label:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Node {node_id} has no neighbors with label '{label.value}'"
+            )
 
+        # Return just the starting node with no links
         return SubgraphResponse(
-            nodes=[
-                GraphNode(
-                    id=node.element_id,
-                    node_id=node_id_prop,
-                    label=node_label,
-                    properties=properties,
-                )
-            ],
+            nodes=[_process_node(node)],
             links=[],
         )
 
-    return _process_path_results(records)
-
-
-@router.get(
-    "/neighbors/{node_id}",
-    response_model=SubgraphResponse,
-    summary="Get immediate neighbors of a node",
-    description="Retrieve all directly connected nodes (1-hop) for a specific node.",
-)
-async def get_neighbors(
-    node_id: int,
-    label: NodeLabel | None = Query(None, description="Label of the starting node"),
-    relationship_type: str | None = Query(None, description="Filter by relationship type"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum neighbors to return"),
-) -> SubgraphResponse:
-    """Get immediate neighbors of a node.
-
-    Args:
-        node_id: The node's node_id property.
-        label: Optional label of the starting node.
-        relationship_type: Optional relationship type filter.
-        limit: Maximum number of neighbors to return.
-
-    Returns:
-        SubgraphResponse with the starting node and its neighbors.
-    """
-    if relationship_type:
-        if label:
-            query = f"""
-            MATCH path = (start:`{label.value}` {{node_id: $node_id}})-[r:`{relationship_type}`]-(neighbor)
-            RETURN path
-            LIMIT $limit
-            """
-        else:
-            query = f"""
-            MATCH path = (start {{node_id: $node_id}})-[r:`{relationship_type}`]-(neighbor)
-            RETURN path
-            LIMIT $limit
-            """
-    else:
-        if label:
-            query = f"""
-            MATCH path = (start:`{label.value}` {{node_id: $node_id}})-[r]-(neighbor)
-            RETURN path
-            LIMIT $limit
-            """
-        else:
-            query = """
-            MATCH path = (start {node_id: $node_id})-[r]-(neighbor)
-            RETURN path
-            LIMIT $limit
-            """
-
-    async with get_session() as session:
-        result = await session.run(query, {"node_id": node_id, "limit": limit})
-        records = await result.data()
-
-    if not records:
-        raise HTTPException(status_code=404, detail=f"Node with node_id {node_id} not found or has no neighbors")
-
-    return _process_path_results(records)
+    return _process_neighbor_results(records)
 
 
 @router.get(

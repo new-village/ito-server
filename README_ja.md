@@ -48,12 +48,10 @@
    - 任意のプロパティで検索
    - ノードラベルでフィルタリング
 
-2. **ネットワーク探索API** (`/api/v1/network/`)
-   - 開始ノードからネットワークを探索
-   - ホップ数を設定可能（1-5）
+2. **ネットワークAPI** (`/api/v1/network/`)
+   - ノードの隣接ノードを取得
+   - ラベルで隣接ノードをフィルタリング
    - ノード間の最短経路を検索
-   - 直接の隣接ノードを取得
-   - 返却エンティティ数の制限
 
 3. **非同期Cypher API** (`/api/v1/cypher/`) 🔒
    - 任意のCypherクエリを実行（認証必須）
@@ -255,15 +253,15 @@ GET /api/v1/search/labels
 
 ### ネットワークAPI
 
-#### ネットワーク探索
-```http
-GET /api/v1/network/traverse/{node_id}?hops={hops}&limit={limit}
-```
-
 #### 隣接ノード取得
 ```http
-GET /api/v1/network/neighbors/{node_id}?relationship_type={type}&limit={limit}
+GET /api/v1/network/neighbors/{node_id}
+GET /api/v1/network/neighbors/{node_id}?label={label}&limit={limit}
 ```
+
+パラメータ:
+- `label` (任意): 隣接ノードをラベルでフィルタリング (`officer`, `entity`, `intermediary`, `address`)
+- `limit` (任意): 最大取得数 (デフォルト: 100)
 
 #### 最短経路検索
 ```http
