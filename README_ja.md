@@ -1,4 +1,4 @@
-# AMI Server
+# NVV Backend
 
 ネットワーク調査のためのFastAPIベースのREST APIバックエンド。Neo4j Auraデータベースに接続し、Google Cloud Runでのデプロイを想定しています。
 
@@ -8,7 +8,7 @@
 ┌─────────────────────────────────────────────────────────────────┐
 │                         Cloud Run                                │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │                      AMI Server                            │  │
+│  │                      NVV Backend                            │  │
 │  │  ┌─────────┐  ┌──────────┐  ┌──────────┐  ┌───────────┐  │  │
 │  │  │ 検索    │  │ネットワ  │  │ Cypher🔒 │  │ ヘルス    │  │  │
 │  │  │  API    │  │ーク API  │  │   API    │  │ チェック  │  │  │
@@ -32,7 +32,7 @@
                         ▼        ▼
               ┌─────────────────┐  ┌─────────────────┐
               │   Neo4j Aura    │  │ Cloud Storage   │
-              │  データベース   │  │  /data/ami.db   │
+              │  データベース   │  │  /data/nvv.db   │
               └─────────────────┘  └─────────────────┘
 ```
 
@@ -121,8 +121,8 @@
 
 1. **リポジトリをクローン**
    ```bash
-   git clone https://github.com/new-village/ami-server.git
-   cd ami-server
+   git clone https://github.com/new-village/nvv-backend.git
+   cd nvv-backend
    ```
 
 2. **仮想環境を作成**
@@ -149,7 +149,7 @@
    
    # 認証
    SECRET_KEY=your-secret-key-change-in-production
-   DATABASE_PATH=./ami.db
+   DATABASE_PATH=./nvv.db
    FIRST_ADMIN_USER=admin
    FIRST_ADMIN_PASSWORD=your-admin-password
    ```
@@ -182,7 +182,7 @@ pytest tests/test_search.py -v
 ### イメージをビルド
 
 ```bash
-docker build -t ami-server .
+docker build -t nvv-backend .
 ```
 
 ### コンテナを実行
@@ -192,7 +192,7 @@ docker run -p 8080:8080 \
   -e NEO4J_URL=neo4j+s://your-instance.databases.neo4j.io \
   -e NEO4J_USERNAME=neo4j \
   -e NEO4J_PASSWORD=your-password \
-  ami-server
+  nvv-backend
 ```
 
 ## ☁️ Google Cloud Runデプロイ
@@ -201,13 +201,13 @@ docker run -p 8080:8080 \
 
 1. **Container Registryにビルドしてプッシュ**
    ```bash
-   gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/ami-server
+   gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/nvv-backend
    ```
 
 2. **Cloud Runにデプロイ**
    ```bash
-   gcloud run deploy ami-server \
-     --image gcr.io/YOUR_PROJECT_ID/ami-server \
+   gcloud run deploy nvv-backend \
+     --image gcr.io/YOUR_PROJECT_ID/nvv-backend \
      --platform managed \
      --region asia-northeast1 \
      --allow-unauthenticated \
@@ -463,7 +463,7 @@ GET /live      # ライブネスチェック
 
 | 設定 | デフォルト | 説明 |
 |------|-----------|------|
-| `APP_NAME` | "AMI Server" | アプリケーション名 |
+| `APP_NAME` | "NVV Backend" | アプリケーション名 |
 | `APP_VERSION` | "1.0.0" | アプリケーションバージョン |
 | `DEBUG` | false | デバッグモード |
 | `DEFAULT_HOPS` | 1 | デフォルト探索ホップ数 |
@@ -474,7 +474,7 @@ GET /live      # ライブネスチェック
 ## 📁 プロジェクト構成
 
 ```
-ami-server/
+nvv-backend/
 ├── app/
 │   ├── __init__.py
 │   ├── config.py              # pydantic-settingsによる設定

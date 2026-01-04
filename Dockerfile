@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # =============================================================================
-# AMI Server - Docker Image for Google Cloud Run
+# NVV Backend - Docker Image for Google Cloud Run
 # =============================================================================
 # Multi-stage build optimized for production deployment on Cloud Run
 # Listens on PORT 8080 (Cloud Run default)

@@ -1,4 +1,4 @@
-# AMI Server
+# NVV Backend
 
 A FastAPI-based REST API backend for network investigation, connecting to Neo4j Aura database. Designed for deployment on Google Cloud Run.
 
@@ -8,7 +8,7 @@ A FastAPI-based REST API backend for network investigation, connecting to Neo4j 
 ┌─────────────────────────────────────────────────────────────────┐
 │                         Cloud Run                                │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │                      AMI Server                            │  │
+│  │                      NVV Backend                            │  │
 │  │  ┌─────────┐  ┌──────────┐  ┌──────────┐  ┌───────────┐  │  │
 │  │  │ Search  │  │ Network  │  │ Cypher🔒 │  │  Health   │  │  │
 │  │  │   API   │  │   API    │  │   API    │  │   Check   │  │  │
@@ -32,7 +32,7 @@ A FastAPI-based REST API backend for network investigation, connecting to Neo4j 
                         ▼        ▼
               ┌─────────────────┐  ┌─────────────────┐
               │   Neo4j Aura    │  │ Cloud Storage   │
-              │    Database     │  │  /data/ami.db   │
+              │    Database     │  │  /data/nvv.db   │
               └─────────────────┘  └─────────────────┘
 ```
 
@@ -121,8 +121,8 @@ Subgraph results follow a structured JSON schema for easy integration with visua
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/new-village/ami-server.git
-   cd ami-server
+   git clone https://github.com/new-village/nvv-backend.git
+   cd nvv-backend
    ```
 
 2. **Create virtual environment**
@@ -149,7 +149,7 @@ Subgraph results follow a structured JSON schema for easy integration with visua
    
    # Authentication
    SECRET_KEY=your-secret-key-change-in-production
-   DATABASE_PATH=./ami.db
+   DATABASE_PATH=./nvv.db
    FIRST_ADMIN_USER=admin
    FIRST_ADMIN_PASSWORD=your-admin-password
    ```
@@ -182,7 +182,7 @@ pytest tests/test_search.py -v
 ### Build Image
 
 ```bash
-docker build -t ami-server .
+docker build -t nvv-backend .
 ```
 
 ### Run Container
@@ -192,7 +192,7 @@ docker run -p 8080:8080 \
   -e NEO4J_URL=neo4j+s://your-instance.databases.neo4j.io \
   -e NEO4J_USERNAME=neo4j \
   -e NEO4J_PASSWORD=your-password \
-  ami-server
+  nvv-backend
 ```
 
 ## ☁️ Google Cloud Run Deployment
@@ -201,13 +201,13 @@ docker run -p 8080:8080 \
 
 1. **Build and push to Container Registry**
    ```bash
-   gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/ami-server
+   gcloud builds submit --tag gcr.io/YOUR_PROJECT_ID/nvv-backend
    ```
 
 2. **Deploy to Cloud Run**
    ```bash
-   gcloud run deploy ami-server \
-     --image gcr.io/YOUR_PROJECT_ID/ami-server \
+   gcloud run deploy nvv-backend \
+     --image gcr.io/YOUR_PROJECT_ID/nvv-backend \
      --platform managed \
      --region asia-northeast1 \
      --allow-unauthenticated \
@@ -463,7 +463,7 @@ Configuration is managed via `pydantic-settings`. All settings can be overridden
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `APP_NAME` | "AMI Server" | Application name |
+| `APP_NAME` | "NVV Backend" | Application name |
 | `APP_VERSION` | "1.0.0" | Application version |
 | `DEBUG` | false | Debug mode |
 | `DEFAULT_HOPS` | 1 | Default traversal hops |
@@ -474,7 +474,7 @@ Configuration is managed via `pydantic-settings`. All settings can be overridden
 ## 📁 Project Structure
 
 ```
-ami-server/
+nvv-backend/
 ├── app/
 │   ├── __init__.py
 │   ├── config.py              # Configuration with pydantic-settings
