@@ -46,7 +46,7 @@ def init_db() -> None:
     Should be called during application startup.
     """
     # Import all models to ensure they're registered with SQLModel
-    from app.models.user import User  # noqa: F401
+    from app.models.user import User, RefreshToken  # noqa: F401
 
     engine = get_engine()
     SQLModel.metadata.create_all(engine)

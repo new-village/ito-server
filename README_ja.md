@@ -226,7 +226,8 @@ docker run -p 8080:8080 \
 | `FIRST_ADMIN_USER` | 初期管理者ユーザー名 | はい |
 | `FIRST_ADMIN_PASSWORD` | 初期管理者パスワード | はい |
 | `ALGORITHM` | JWTアルゴリズム | いいえ（デフォルト: HS256） |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | JWTトークン有効期限 | いいえ（デフォルト: 30） |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | アクセストークン有効期限（分） | いいえ（デフォルト: 15） |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | リフレッシュトークン有効期限（日） | いいえ（デフォルト: 7） |
 | `DEBUG` | デバッグモードを有効化 | いいえ（デフォルト: false） |
 
 ## 📖 APIドキュメント
@@ -342,6 +343,8 @@ GET /api/v1/cypher/stats
 
 ### 認証API
 
+認証システムは短命のアクセストークン（15分）と長命のリフレッシュトークン（7日間）を使用し、リフレッシュトークンはデータベースに保存されます。これにより、ログアウトやセッション無効化が可能な安全なセッション管理を提供します。
+
 #### ログイン
 ```http
 POST /api/v1/auth/login
@@ -354,14 +357,40 @@ username=admin&password=admin
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "abc123...",
+  "token_type": "bearer"
+}
+```
+
+#### トークン更新
+有効なリフレッシュトークンを使用して新しいアクセストークンを取得します。リフレッシュトークンもローテーションされます（新しいものが発行されます）。
+```http
+POST /api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "abc123..."
+}
+```
+
+レスポンス:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "xyz789...",
   "token_type": "bearer"
 }
 ```
 
 #### ログアウト
+特定のリフレッシュトークンを無効化してそのセッションを終了します。
 ```http
 POST /api/v1/auth/logout
-Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "refresh_token": "abc123..."
+}
 ```
 
 レスポンス:
@@ -371,10 +400,24 @@ Authorization: Bearer <token>
 }
 ```
 
-#### 現在のユーザーを取得
+#### 全セッションからログアウト (🔒 認証必須)
+現在のユーザーのすべてのリフレッシュトークンを無効化します。
+```http
+POST /api/v1/auth/logout-all
+Authorization: Bearer <access_token>
+```
+
+レスポンス:
+```json
+{
+  "message": "Successfully logged out from 3 session(s)"
+}
+```
+
+#### 現在のユーザーを取得 (🔒 認証必須)
 ```http
 GET /api/v1/auth/me
-Authorization: Bearer <token>
+Authorization: Bearer <access_token>
 ```
 
 ### ヘルスエンドポイント

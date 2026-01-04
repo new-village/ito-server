@@ -226,7 +226,8 @@ docker run -p 8080:8080 \
 | `FIRST_ADMIN_USER` | Initial admin username | Yes |
 | `FIRST_ADMIN_PASSWORD` | Initial admin password | Yes |
 | `ALGORITHM` | JWT algorithm | No (default: HS256) |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT token expiry | No (default: 30) |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | Access token expiry in minutes | No (default: 15) |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token expiry in days | No (default: 7) |
 | `DEBUG` | Enable debug mode | No (default: false) |
 
 ## 📖 API Documentation
@@ -342,6 +343,8 @@ GET /api/v1/cypher/stats
 
 ### Authentication API
 
+The authentication system uses short-lived access tokens (15 minutes) and long-lived refresh tokens (7 days) stored in the database. This provides secure session management with the ability to logout and invalidate sessions.
+
 #### Login
 ```http
 POST /api/v1/auth/login
@@ -354,14 +357,40 @@ Response:
 ```json
 {
   "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "abc123...",
+  "token_type": "bearer"
+}
+```
+
+#### Refresh Token
+Get a new access token using a valid refresh token. The refresh token is rotated (a new one is issued).
+```http
+POST /api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "abc123..."
+}
+```
+
+Response:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refresh_token": "xyz789...",
   "token_type": "bearer"
 }
 ```
 
 #### Logout
+Invalidate a specific refresh token to end that session.
 ```http
 POST /api/v1/auth/logout
-Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "refresh_token": "abc123..."
+}
 ```
 
 Response:
@@ -371,10 +400,24 @@ Response:
 }
 ```
 
-#### Get Current User
+#### Logout All Sessions (🔒 Requires Authentication)
+Invalidate all refresh tokens for the current user.
+```http
+POST /api/v1/auth/logout-all
+Authorization: Bearer <access_token>
+```
+
+Response:
+```json
+{
+  "message": "Successfully logged out from 3 session(s)"
+}
+```
+
+#### Get Current User (🔒 Requires Authentication)
 ```http
 GET /api/v1/auth/me
-Authorization: Bearer <token>
+Authorization: Bearer <access_token>
 ```
 
 ### Health Endpoints

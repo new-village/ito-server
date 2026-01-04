@@ -3,8 +3,11 @@
 Provides:
 - Password hashing with bcrypt
 - JWT token creation and decoding
+- Refresh token generation
 """
 
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -96,3 +99,24 @@ def decode_access_token(token: str) -> dict[str, Any] | None:
         return payload
     except jwt.JWTError:
         return None
+
+
+def generate_refresh_token() -> str:
+    """Generate a secure random refresh token.
+
+    Returns:
+        A URL-safe random token string (64 characters).
+    """
+    return secrets.token_urlsafe(48)
+
+
+def hash_refresh_token(token: str) -> str:
+    """Hash a refresh token using SHA256.
+
+    Args:
+        token: The plain refresh token.
+
+    Returns:
+        The SHA256 hash of the token.
+    """
+    return hashlib.sha256(token.encode()).hexdigest()

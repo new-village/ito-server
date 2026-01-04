@@ -46,7 +46,8 @@ class Settings(BaseSettings):
     # JWT Authentication Settings (Required)
     SECRET_KEY: SecretStr
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15  # Short-lived access token
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7     # Long-lived refresh token
 
     # First Admin User (Required - auto-created on startup if no users exist)
     FIRST_ADMIN_USER: str

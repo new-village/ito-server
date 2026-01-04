@@ -3,7 +3,7 @@
 Defines the User table for SQLite storage and related schemas.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from pydantic import EmailStr
@@ -29,8 +29,25 @@ class User(UserBase, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     hashed_password: str = Field(min_length=1)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class RefreshToken(SQLModel, table=True):
+    """Refresh token database model (SQLite table).
+
+    Stores refresh tokens for session management.
+    Tokens are hashed for security.
+    """
+
+    __tablename__ = "refresh_tokens"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    token_hash: str = Field(unique=True, index=True)  # SHA256 hash of token
+    user_id: int = Field(foreign_key="users.id", index=True)
+    expires_at: datetime
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    is_revoked: bool = Field(default=False)
 
 
 class UserCreate(SQLModel):
@@ -63,10 +80,17 @@ class UserUpdate(SQLModel):
 
 
 class Token(SQLModel):
-    """JWT token response schema."""
+    """JWT token response schema with access and refresh tokens."""
 
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
+
+
+class RefreshTokenRequest(SQLModel):
+    """Request schema for token refresh."""
+
+    refresh_token: str
 
 
 class TokenData(SQLModel):
