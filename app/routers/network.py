@@ -183,18 +183,10 @@ async def get_neighbors(
                 break
 
         if not check_node:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Node with node_id {node_id} not found"
-            )
+            # Node not found - return empty result with 200
+            return SubgraphResponse(nodes=[], links=[])
 
         # Node exists but has no neighbors (or no neighbors with the specified label)
-        if label:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Node {node_id} has no neighbors with label '{label.value}'"
-            )
-
         # Return just the starting node with no links
         return SubgraphResponse(
             nodes=[_process_node(check_node)],
@@ -241,12 +233,7 @@ async def find_shortest_path(
         )
         response = await _process_path_results(session, result)
 
-    if not response.nodes:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No path found between nodes {start_node_id} and {end_node_id} within {max_hops} hops"
-        )
-
+    # Return empty result with 200 if no path found
     return response
 
 

@@ -140,7 +140,7 @@ class TestGetNeighbors:
 
     @pytest.mark.asyncio
     async def test_get_neighbors_node_not_found(self, authenticated_test_client):
-        """Test getting neighbors of a non-existent node."""
+        """Test getting neighbors of a non-existent node returns empty result."""
         # First query returns no results
         mock_result = create_mock_neo4j_result([])
 
@@ -159,7 +159,10 @@ class TestGetNeighbors:
 
             response = await authenticated_test_client.get("/api/v1/network/neighbors/99999999")
 
-            assert response.status_code == 404
+            assert response.status_code == 200
+            data = response.json()
+            assert data["nodes"] == []
+            assert data["links"] == []
 
     @pytest.mark.asyncio
     async def test_get_neighbors_no_neighbors_with_label(self, authenticated_test_client):
@@ -184,8 +187,11 @@ class TestGetNeighbors:
 
             response = await authenticated_test_client.get("/api/v1/network/neighbors/12345?label=intermediary")
 
-            assert response.status_code == 404
-            assert "no neighbors with label" in response.json()["detail"]
+            assert response.status_code == 200
+            data = response.json()
+            # Node exists but no neighbors with the specified label
+            assert len(data["nodes"]) == 1
+            assert data["links"] == []
 
     @pytest.mark.asyncio
     async def test_get_neighbors_includes_falsy_relationship(self, authenticated_test_client):
@@ -296,7 +302,7 @@ class TestShortestPath:
 
     @pytest.mark.asyncio
     async def test_shortest_path_not_found(self, authenticated_test_client):
-        """Test when no path exists between nodes."""
+        """Test when no path exists between nodes returns empty result."""
         mock_result = create_mock_neo4j_result([])
 
         mock_session = MagicMock()
@@ -313,7 +319,10 @@ class TestShortestPath:
                 "/api/v1/network/shortest-path?start_node_id=12345&end_node_id=99999"
             )
 
-            assert response.status_code == 404
+            assert response.status_code == 200
+            data = response.json()
+            assert data["nodes"] == []
+            assert data["links"] == []
 
     @pytest.mark.asyncio
     async def test_shortest_path_requires_auth(self, test_client):

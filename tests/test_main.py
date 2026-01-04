@@ -16,7 +16,7 @@ class TestRootEndpoint:
         data = response.json()
         assert "name" in data
         assert "version" in data
-        assert data["name"] == "ITO Server"
+        assert data["name"] == "AMI Server"
         assert data["docs"] == "/docs"
 
 
