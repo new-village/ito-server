@@ -333,26 +333,6 @@ class TestShortestPath:
         assert response.status_code == 401
 
 
-class TestGetRelationshipTypes:
-    """Tests for the get relationship types endpoint."""
-
-    @pytest.mark.asyncio
-    async def test_get_relationship_types(self, authenticated_test_client):
-        """Test getting available relationship types."""
-        response = await authenticated_test_client.get("/api/v1/network/relationship-types")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "relationship_types" in data
-        assert len(data["relationship_types"]) == 6  # 6 relationship types in schema
-
-    @pytest.mark.asyncio
-    async def test_get_relationship_types_requires_auth(self, test_client):
-        """Test that relationship-types endpoint requires authentication."""
-        response = await test_client.get("/api/v1/network/relationship-types")
-        assert response.status_code == 401
-
-
 class TestGetRelationships:
     """Tests for the get relationships endpoint."""
 

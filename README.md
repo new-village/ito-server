@@ -256,12 +256,6 @@ Authorization: Bearer <token>
 
 Available labels: `officer`, `entity`, `intermediary`, `address`
 
-#### Get Available Labels
-```http
-GET /api/v1/search/labels
-Authorization: Bearer <token>
-```
-
 ### Network API (🔒 Requires Authentication)
 
 #### Get Neighbors
@@ -311,11 +305,6 @@ Response:
 }
 ```
 
-#### Get Relationship Types
-```http
-GET /api/v1/network/relationship-types
-Authorization: Bearer <token>
-```
 
 ### Cypher API (🔒 Requires Authentication)
 

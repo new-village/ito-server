@@ -157,28 +157,3 @@ class TestSearchByLabel:
         assert response.status_code == 422  # Validation error
 
 
-class TestGetLabels:
-    """Tests for the get labels endpoint."""
-
-    @pytest.mark.asyncio
-    async def test_get_labels(self, authenticated_test_client):
-        """Test getting available node labels."""
-        response = await authenticated_test_client.get("/api/v1/search/labels")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "labels" in data
-        assert len(data["labels"]) == 4  # 4 node labels in schema
-
-        # Verify all expected labels are present
-        label_values = [label["value"] for label in data["labels"]]
-        assert "officer" in label_values
-        assert "entity" in label_values
-        assert "intermediary" in label_values
-        assert "address" in label_values
-
-    @pytest.mark.asyncio
-    async def test_get_labels_requires_auth(self, test_client):
-        """Test that get labels endpoint requires authentication."""
-        response = await test_client.get("/api/v1/search/labels")
-        assert response.status_code == 401

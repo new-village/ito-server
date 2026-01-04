@@ -311,29 +311,4 @@ async def get_relationships(
     return response
 
 
-@router.get(
-    "/relationship-types",
-    summary="Get available relationship types",
-    description="Return all available relationship types in the schema. Requires authentication.",
-)
-async def get_relationship_types(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-) -> dict:
-    """Get all available relationship types.
 
-    Args:
-        current_user: The authenticated user (injected by dependency).
-
-    Returns:
-        Dictionary with available relationship types and their descriptions.
-    """
-    return {
-        "relationship_types": [
-            {"value": "役員", "description": "Officer relationship"},
-            {"value": "仲介", "description": "Intermediary relationship"},
-            {"value": "所在地", "description": "Location relationship"},
-            {"value": "登録住所", "description": "Registered address relationship"},
-            {"value": "同名人物", "description": "Same name person"},
-            {"value": "同一人物?", "description": "Possibly same person"},
-        ]
-    }

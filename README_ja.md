@@ -256,12 +256,6 @@ Authorization: Bearer <token>
 
 利用可能なラベル: `officer`, `entity`, `intermediary`, `address`
 
-#### 利用可能なラベルを取得
-```http
-GET /api/v1/search/labels
-Authorization: Bearer <token>
-```
-
 ### ネットワークAPI (🔒 認証必須)
 
 #### 隣接ノード取得
@@ -311,11 +305,6 @@ Authorization: Bearer <token>
 }
 ```
 
-#### リレーションシップタイプ取得
-```http
-GET /api/v1/network/relationship-types
-Authorization: Bearer <token>
-```
 
 ### Cypher API (🔒 認証必須)
 

@@ -103,31 +103,6 @@ async def search_all(
     return SearchResponse(nodes=nodes, total=len(nodes))
 
 
-@router.get(
-    "/labels",
-    summary="Get available node labels",
-    description="Return all available node labels in the schema. Requires authentication.",
-)
-async def get_labels(
-    current_user: Annotated[User, Depends(get_current_active_user)],
-) -> dict:
-    """Get all available node labels.
-
-    Args:
-        current_user: The authenticated user (injected by dependency).
-
-    Returns:
-        Dictionary with available labels and their descriptions.
-    """
-    return {
-        "labels": [
-            {"value": NodeLabel.OFFICER.value, "description": "Officers and shareholders"},
-            {"value": NodeLabel.ENTITY.value, "description": "Corporate entities"},
-            {"value": NodeLabel.INTERMEDIARY.value, "description": "Intermediaries"},
-            {"value": NodeLabel.ADDRESS.value, "description": "Addresses"},
-        ]
-    }
-
 
 @router.get(
     "/{label}",
