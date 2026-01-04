@@ -1,4 +1,4 @@
-"""Configuration settings for ITO Server.
+"""Configuration settings for AMI Server.
 
 Uses pydantic-settings for environment variable management.
 - Dev: Loads from .env file
@@ -19,7 +19,7 @@ REQUIRED_ENV_VARS = {
     "NEO4J_URL": "Neo4j database connection URL (e.g., neo4j+s://xxx.databases.neo4j.io)",
     "NEO4J_USERNAME": "Neo4j username",
     "NEO4J_PASSWORD": "Neo4j password",
-    "DATABASE_PATH": "SQLite database file path (e.g., ./ito.db)",
+    "DATABASE_PATH": "SQLite database file path (e.g., ./ami.db)",
     "SECRET_KEY": "Secret key for JWT token signing (min 32 characters)",
     "FIRST_ADMIN_USER": "Initial admin username",
     "FIRST_ADMIN_PASSWORD": "Initial admin password",
@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     FIRST_ADMIN_PASSWORD: SecretStr
 
     # Application Settings
-    APP_NAME: str = "ITO Server"
+    APP_NAME: str = "AMI Server"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
 
