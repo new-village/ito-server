@@ -351,3 +351,114 @@ class TestGetRelationshipTypes:
         """Test that relationship-types endpoint requires authentication."""
         response = await test_client.get("/api/v1/network/relationship-types")
         assert response.status_code == 401
+
+
+class TestGetRelationships:
+    """Tests for the get relationships endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_relationships(self, authenticated_test_client):
+        """Test getting relationships of a node."""
+        node1 = create_mock_node("4:test:1", ["entity"], {"node_id": 12345, "name": "Company A"})
+        node2 = create_mock_node("4:test:2", ["officer"], {"node_id": 12346, "name": "Person B"})
+        rel1 = create_mock_relationship("5:test:1", "役員", node2, node1, {})
+        rel2 = create_mock_relationship("5:test:2", "所在地", node1, node2, {"since": "2020"})
+
+        mock_result = create_mock_neo4j_result([{"r": rel1}, {"r": rel2}])
+
+        mock_session = MagicMock()
+        mock_session.run = AsyncMock(return_value=mock_result)
+        mock_session.close = AsyncMock()
+
+        with patch("app.routers.network.get_session") as mock_get_session:
+            mock_context = MagicMock()
+            mock_context.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_context.__aexit__ = AsyncMock(return_value=None)
+            mock_get_session.return_value = mock_context
+
+            response = await authenticated_test_client.get("/api/v1/network/relationships/12345")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert "relationships" in data
+            assert len(data["relationships"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_get_relationships_with_type_filter(self, authenticated_test_client):
+        """Test getting relationships filtered by type."""
+        node1 = create_mock_node("4:test:1", ["entity"], {"node_id": 12345, "name": "Company A"})
+        node2 = create_mock_node("4:test:2", ["officer"], {"node_id": 12346, "name": "Person B"})
+        rel = create_mock_relationship("5:test:1", "役員", node2, node1, {})
+
+        mock_result = create_mock_neo4j_result([{"r": rel}])
+
+        mock_session = MagicMock()
+        mock_session.run = AsyncMock(return_value=mock_result)
+        mock_session.close = AsyncMock()
+
+        with patch("app.routers.network.get_session") as mock_get_session:
+            mock_context = MagicMock()
+            mock_context.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_context.__aexit__ = AsyncMock(return_value=None)
+            mock_get_session.return_value = mock_context
+
+            response = await authenticated_test_client.get("/api/v1/network/relationships/12345?rel_type=役員")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert "relationships" in data
+            assert len(data["relationships"]) == 1
+            assert data["relationships"][0]["type"] == "役員"
+
+    @pytest.mark.asyncio
+    async def test_get_relationships_no_results(self, authenticated_test_client):
+        """Test getting relationships when node has none returns empty list."""
+        mock_result = create_mock_neo4j_result([])
+
+        mock_session = MagicMock()
+        mock_session.run = AsyncMock(return_value=mock_result)
+        mock_session.close = AsyncMock()
+
+        with patch("app.routers.network.get_session") as mock_get_session:
+            mock_context = MagicMock()
+            mock_context.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_context.__aexit__ = AsyncMock(return_value=None)
+            mock_get_session.return_value = mock_context
+
+            response = await authenticated_test_client.get("/api/v1/network/relationships/99999999")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["relationships"] == []
+
+    @pytest.mark.asyncio
+    async def test_get_relationships_includes_falsy_relationship(self, authenticated_test_client):
+        """Regression: include relationships even if Relationship is falsy (e.g., no properties)."""
+        node1 = create_mock_node("4:test:1", ["officer"], {"node_id": 12345, "name": "Person A"})
+        node2 = create_mock_node("4:test:2", ["address"], {"node_id": 67890, "address": "Somewhere"})
+        rel = create_mock_relationship("5:test:1", "所在地", node1, node2, {})
+        rel.__bool__.return_value = False
+
+        mock_result = create_mock_neo4j_result([{"r": rel}])
+
+        mock_session = MagicMock()
+        mock_session.run = AsyncMock(return_value=mock_result)
+        mock_session.close = AsyncMock()
+
+        with patch("app.routers.network.get_session") as mock_get_session:
+            mock_context = MagicMock()
+            mock_context.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_context.__aexit__ = AsyncMock(return_value=None)
+            mock_get_session.return_value = mock_context
+
+            response = await authenticated_test_client.get("/api/v1/network/relationships/12345")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert len(data["relationships"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_get_relationships_requires_auth(self, test_client):
+        """Test that relationships endpoint requires authentication."""
+        response = await test_client.get("/api/v1/network/relationships/12345")
+        assert response.status_code == 401

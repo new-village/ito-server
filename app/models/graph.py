@@ -147,6 +147,12 @@ class SubgraphResponse(BaseModel):
     links: list[GraphLink] = Field(default_factory=list, description="List of links/edges")
 
 
+class RelationshipsResponse(BaseModel):
+    """Response model for relationships queries."""
+
+    relationships: list[GraphLink] = Field(default_factory=list, description="List of relationships")
+
+
 # =============================================================================
 # Search Request/Response Models
 # =============================================================================

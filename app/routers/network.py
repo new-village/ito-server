@@ -9,6 +9,7 @@ from app.models import (
     GraphLink,
     GraphNode,
     NodeLabel,
+    RelationshipsResponse,
     SubgraphResponse,
 )
 from app.models.user import User
@@ -126,6 +127,30 @@ async def _process_neighbor_results(result) -> SubgraphResponse:
     )
 
 
+async def _process_relationships_results(result) -> RelationshipsResponse:
+    """Process relationships query results using async iteration.
+
+    Args:
+        result: Neo4j result object.
+
+    Returns:
+        RelationshipsResponse with unique relationships.
+    """
+    links_dict: dict[str, GraphLink] = {}
+
+    async for record in result:
+        rel = record.get("r")
+
+        # Neo4j Relationship objects can be "falsy" when they have no properties.
+        # Avoid truthiness checks; explicitly test for None.
+        if rel is not None and rel.element_id not in links_dict:
+            links_dict[rel.element_id] = _process_relationship(rel)
+
+    return RelationshipsResponse(
+        relationships=list(links_dict.values()),
+    )
+
+
 @router.get(
     "/neighbors/{node_id}",
     response_model=SubgraphResponse,
@@ -234,6 +259,55 @@ async def find_shortest_path(
         response = await _process_path_results(session, result)
 
     # Return empty result with 200 if no path found
+    return response
+
+
+@router.get(
+    "/relationships/{node_id}",
+    response_model=RelationshipsResponse,
+    summary="Get relationships of a node",
+    description="Retrieve all relationships connected to a specific node. "
+    "Optionally filter by relationship type. Requires authentication.",
+)
+async def get_relationships(
+    node_id: int,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    rel_type: str | None = Query(None, description="Filter relationships by type"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum relationships to return"),
+) -> RelationshipsResponse:
+    """Get relationships of a node.
+
+    Args:
+        node_id: The node's node_id property.
+        current_user: The authenticated user (injected by dependency).
+        rel_type: Optional relationship type to filter.
+        limit: Maximum number of relationships to return.
+
+    Returns:
+        RelationshipsResponse with the relationships connected to the node.
+    """
+    settings = get_settings()
+    limit = min(limit, settings.MAX_LIMIT)
+
+    if rel_type:
+        # Filter relationships by type
+        query = f"""
+        MATCH (n {{node_id: $node_id}})-[r:`{rel_type}`]-()
+        RETURN r
+        LIMIT $limit
+        """
+    else:
+        # Get all relationships regardless of type
+        query = """
+        MATCH (n {node_id: $node_id})-[r]-()
+        RETURN r
+        LIMIT $limit
+        """
+
+    async with get_session() as session:
+        result = await session.run(query, {"node_id": node_id, "limit": limit})
+        response = await _process_relationships_results(result)
+
     return response
 
 

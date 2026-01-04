@@ -11,6 +11,7 @@ from app.models.graph import (
     HealthResponse,
     NodeLabel,
     RelationshipType,
+    RelationshipsResponse,
     SearchResponse,
     SubgraphResponse,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "HealthResponse",
     "NodeLabel",
     "RelationshipType",
+    "RelationshipsResponse",
     "SearchResponse",
     "SubgraphResponse",
     # User models

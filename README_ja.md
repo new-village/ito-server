@@ -284,6 +284,38 @@ Authorization: Bearer <token>
 パラメータ:
 - `max_hops` (任意): 探索する経路長の上限 (デフォルト: 4、範囲: 1-10)
 
+#### リレーションシップ取得
+```http
+GET /api/v1/network/relationships/{node_id}
+GET /api/v1/network/relationships/{node_id}?rel_type={type}&limit={limit}
+Authorization: Bearer <token>
+```
+
+パラメータ:
+- `rel_type` (任意): リレーションシップタイプでフィルタリング
+- `limit` (任意): 最大取得数 (デフォルト: 100)
+
+レスポンス:
+```json
+{
+  "relationships": [
+    {
+      "id": "5:abc:456",
+      "source": "4:abc:123",
+      "target": "4:abc:789",
+      "type": "役員",
+      "properties": {}
+    }
+  ]
+}
+```
+
+#### リレーションシップタイプ取得
+```http
+GET /api/v1/network/relationship-types
+Authorization: Bearer <token>
+```
+
 ### Cypher API (🔒 認証必須)
 
 #### クエリ実行

@@ -284,6 +284,38 @@ Authorization: Bearer <token>
 Parameters:
 - `max_hops` (optional): Maximum path length to search (default: 4, range: 1-10)
 
+#### Get Relationships
+```http
+GET /api/v1/network/relationships/{node_id}
+GET /api/v1/network/relationships/{node_id}?rel_type={type}&limit={limit}
+Authorization: Bearer <token>
+```
+
+Parameters:
+- `rel_type` (optional): Filter relationships by type
+- `limit` (optional): Maximum relationships to return (default: 100)
+
+Response:
+```json
+{
+  "relationships": [
+    {
+      "id": "5:abc:456",
+      "source": "4:abc:123",
+      "target": "4:abc:789",
+      "type": "役員",
+      "properties": {}
+    }
+  ]
+}
+```
+
+#### Get Relationship Types
+```http
+GET /api/v1/network/relationship-types
+Authorization: Bearer <token>
+```
+
 ### Cypher API (🔒 Requires Authentication)
 
 #### Execute Query
