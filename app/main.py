@@ -12,11 +12,11 @@ from sqlmodel import Session, select
 
 from app.config import get_settings
 from app.db.neo4j import Neo4jConnection
-from app.db.session import init_db, get_engine
+from app.db.session import init_db, init_flag_db, get_engine, FLAG_DATABASE_PATH
 from app.models import HealthResponse
 from app.models.user import User
 from app.auth.security import get_password_hash
-from app.routers import search, network, cypher
+from app.routers import search, network, cypher, flag
 from app.api.auth import router as auth_router
 
 
@@ -64,6 +64,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     print("Initializing SQLite database...")
     init_db()
     print(f"✅ SQLite database ready at {settings.DATABASE_PATH}")
+
+    # Initialize Flag database
+    print("Initializing Flag database...")
+    init_flag_db()
+    print(f"✅ Flag database ready at {FLAG_DATABASE_PATH}")
 
     # Bootstrap admin user if needed
     bootstrap_admin_user()
@@ -143,6 +148,7 @@ Authorization: Bearer <your_token>
     app.include_router(search.router, prefix="/api/v1")
     app.include_router(network.router, prefix="/api/v1")
     app.include_router(cypher.router, prefix="/api/v1")
+    app.include_router(flag.router, prefix="/api/v1")
 
     return app
 

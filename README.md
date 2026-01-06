@@ -65,6 +65,12 @@ A FastAPI-based REST API backend for network investigation, connecting to Neo4j 
    - User profile retrieval
    - SQLite-based user storage
 
+5. **Flag API** (`/api/v1/flag/`) 🔒
+   - Risk flag management with SQLite storage
+   - Get flags by subject ID with related flags
+   - Bulk create flags for multiple subjects
+   - Delete flags by flag ID
+
 ### Graph Schema
 
 **Node Labels:**
@@ -449,6 +455,80 @@ GET /api/v1/auth/me
 Authorization: Bearer <access_token>
 ```
 
+### Flag API (🔒 Requires Authentication)
+
+Risk flag management API using SQLite storage (`data/flags.db`).
+
+#### Get Flags by Subject ID
+Retrieve all flags associated with a subject and all related flags sharing the same flag_id.
+```http
+GET /api/v1/flag/{subject_id}
+Authorization: Bearer <token>
+```
+
+Response:
+```json
+{
+  "flags": [
+    {
+      "flag_id": "202601060002",
+      "rule_id": "RULE-002",
+      "score": 10,
+      "parameter": "10000",
+      "create_date": "2026-01-01T12:13:52",
+      "create_by": "ADMIN",
+      "subject_ids": ["12129942", "240070570"]
+    }
+  ],
+  "total": 1
+}
+```
+
+#### Create Flag
+Create flag records for multiple subject IDs with the same flag_id.
+```http
+POST /api/v1/flag
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "flag_id": "202601060003",
+  "subject_ids": ["11111111", "22222222"],
+  "rule_id": "RULE-003",
+  "score": 15,
+  "parameter": "USD",
+  "create_date": "2026-01-06T10:00:00Z",
+  "create_by": "SYSTEM"
+}
+```
+
+Response (201 Created):
+```json
+{
+  "flag_id": "202601060003",
+  "rule_id": "RULE-003",
+  "score": 15,
+  "parameter": "USD",
+  "create_date": "2026-01-06T10:00:00Z",
+  "create_by": "SYSTEM",
+  "subject_ids": ["11111111", "22222222"]
+}
+```
+
+#### Delete Flag
+Delete all flag records associated with a flag_id.
+```http
+DELETE /api/v1/flag/{flag_id}
+Authorization: Bearer <token>
+```
+
+Response:
+```json
+{
+  "flag_id": "202601060002",
+  "deleted_count": 2
+}
+
 ### Health Endpoints
 
 ```http
@@ -493,12 +573,14 @@ nvv-backend/
 │   ├── models/
 │   │   ├── __init__.py
 │   │   ├── graph.py           # Graph response models
-│   │   └── user.py            # User SQLModel
+│   │   ├── user.py            # User SQLModel
+│   │   └── flag.py            # Flag SQLModel
 │   └── routers/
 │       ├── __init__.py
 │       ├── search.py          # Search API endpoints
 │       ├── network.py         # Network traversal endpoints
-│       └── cypher.py          # Cypher query endpoints (protected)
+│       ├── cypher.py          # Cypher query endpoints (protected)
+│       └── flag.py            # Flag API endpoints
 ├── tests/
 │   ├── __init__.py
 │   ├── conftest.py            # Test fixtures
@@ -506,7 +588,8 @@ nvv-backend/
 │   ├── test_main.py
 │   ├── test_search.py
 │   ├── test_network.py
-│   └── test_cypher.py
+│   ├── test_cypher.py
+│   └── test_flag.py           # Flag API tests
 ├── schema/
 │   └── neo4j_importer_model.json
 ├── Dockerfile
